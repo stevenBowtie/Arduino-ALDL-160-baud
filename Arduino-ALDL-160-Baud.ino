@@ -1,26 +1,30 @@
-#define ALDL_PIN 0
+#include <Arduino.h>
+
+#define ALDL_PIN 3
 
 #define SERIAL_DEBUG
 
 // Number of bytes per ALDL frame
-#define ALDL_FRAME_BUF_SIZE 50
+//#define ALDL_FRAME_BUF_SIZE 50
+//TODO: Make this adjustable/automatic
+#define ALDL_FRAME_BUF_SIZE 20
 
 // Number of bits per ALDL byte
 #define ALDL_BYTE_SIZE 8
 
 // Minimum microsecs for a complete packet
-#define ALDL_MIN_PACKET_TIME 5915
+#define ALDL_MIN_PACKET_TIME 6000
 
 // Maximum microsecs for a complete packet
-#define ALDL_MAX_PACKET_TIME 5925
+#define ALDL_MAX_PACKET_TIME 6400
 
 // Approx "start bit" max microsecs when transmitting a "0"
-#define ALDL_0_MIN_LENGTH 360
-#define ALDL_0_MAX_LENGTH 370
+#define ALDL_0_MIN_LENGTH 100
+#define ALDL_0_MAX_LENGTH 600
 
 // Approx "start bit" min microsecs when transmitting a "1"
-#define ALDL_1_MIN_LENGTH 1850
-#define ALDL_1_MAX_LENGTH 1899
+#define ALDL_1_MIN_LENGTH 4000
+#define ALDL_1_MAX_LENGTH 6500
 
 int frame[ALDL_FRAME_BUF_SIZE];
 
@@ -29,19 +33,27 @@ volatile unsigned int bitIndex = 0;
 volatile unsigned int bitTime = 0;
 volatile unsigned int curBit = 0;
 volatile unsigned long curTime = micros();
-volatile unsigned long prevTimeTime = micros();
+volatile unsigned long prevTime = micros();
+
+unsigned long interruptCount = 0;
+int modCount = 0;
+int lastModCount = 0;
+unsigned long lastPrint = 0;
 
 void setup() {
     // Clear the frame buffer
-    for (int i = 0; i < ALDL_NUM_WORDS; i++) {
+    for (int i = 0; i < ALDL_FRAME_BUF_SIZE; i++) {
         frame[i] = (byte)0x00;
     }
 
     pinMode(ALDL_PIN, INPUT);
-    attachInterrupt(ALDL_PIN, interrupt, CHANGE);
+    attachInterrupt( digitalPinToInterrupt( ALDL_PIN ) , interrupt, CHANGE);
+    Serial.begin( 115200 );
+    Serial.write( "Begin data stream...\r\n" );
 }
 
 void interrupt() {
+  interruptCount++;
     if (!readBit()) return;
 
     if (bitIndex == 0) {
@@ -54,6 +66,11 @@ void interrupt() {
 bool readBit() {
     curTime = micros();
     bitTime = curTime - prevTime;
+    if( !digitalRead( 3 ) ){
+      prevTime = micros(); 
+    }
+    
+  //Serial.println( bitTime );
 
     if (bitTime <= ALDL_0_MAX_LENGTH && bitTime >= ALDL_0_MIN_LENGTH) {
         curBit = 0;
@@ -62,14 +79,14 @@ bool readBit() {
     } else if (bitTime < ALDL_0_MIN_LENGTH) {
         // Too short to be a bit
         // Could be noise so we don't reset prevTime
+        //Serial.println( "ERR: Too short");
         return false;
     } else {
+        //Serial.println( "ERR: Too long");
         // Too long to be a bit
-        prevTime = curTime;
+        //prevTime = curTime;
         return false;
     }
-
-    prevTime = curTime;
 }
 
 void syncBit() {
@@ -95,16 +112,41 @@ void startBit() {
     ++bitIndex;
 }
 
-// Add data bit to the packet framefer
+// Add data bit to the packet frame
 void dataBit() {
     frame[byteIndex] |= curBit << bitIndex;
 
     if (++bitIndex > ALDL_BYTE_SIZE) {
         // We have a complete data byte
         if (++byteIndex >= ALDL_FRAME_BUF_SIZE) {
-            byteIndex = 0;
+          for( int i = 0; i++; i < ALDL_FRAME_BUF_SIZE ){
+            Serial.write( frame[i] );
+        }
+          Serial.write( "\r\n" );
+          Serial.flush();
+          byteIndex = 0;
         }
 
         bitIndex = 0;
     }
 }
+
+uint_16 bitBuffer = 0;
+void syncCheck(){
+  if(
+}
+
+void loop(){
+  /*
+  if( millis() - lastPrint > 1000 ){
+    Serial.println( interruptCount );
+    lastPrint = millis();
+  }
+  */
+  //Serial.println( digitalRead( 3 ) );
+  Serial.flush();
+}
+
+
+
+
