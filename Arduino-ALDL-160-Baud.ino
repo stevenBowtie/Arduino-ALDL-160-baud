@@ -56,11 +56,13 @@ void interrupt() {
   interruptCount++;
     if (!readBit()) return;
 
+/*
     if (bitIndex == 0) {
         startBit();
     } else {
         dataBit();
     }
+*/
 }
 
 bool readBit() {
@@ -73,9 +75,11 @@ bool readBit() {
   //Serial.println( bitTime );
 
     if (bitTime <= ALDL_0_MAX_LENGTH && bitTime >= ALDL_0_MIN_LENGTH) {
-        curBit = 0;
+        //curBit = 0;
+      nextBit( 0 );
     } else if (bitTime <= ALDL_1_MAX_LENGTH && bitTime >= ALDL_1_MIN_LENGTH) {
-        curBit = 1;
+        //curBit = 1;
+      nextBit( 1 );
     } else if (bitTime < ALDL_0_MIN_LENGTH) {
         // Too short to be a bit
         // Could be noise so we don't reset prevTime
@@ -89,28 +93,6 @@ bool readBit() {
     }
 }
 
-void syncBit() {
-    if (curBit != 1) {
-        bitIndex = 0;
-        return;
-    }
-
-    if (++bitIndex > ALDL_BYTE_SIZE) {
-        bitIndex = 0;
-        byteIndex = 0;
-    }
-}
-
-void startBit() {
-    if (curBit == 1) {
-        // Start bit is "1" which means
-        // we're receiving a "sync" bit
-        syncBit();
-        return;
-    }
-
-    ++bitIndex;
-}
 
 // Add data bit to the packet frame
 void dataBit() {
@@ -131,7 +113,8 @@ void dataBit() {
     }
 }
 
-uint_16 bitBuffer = 0;
+uint16_t thisByte = 0;
+/*
 void syncCheck(){
   bitBuffer = 511 & bitBuffer;
   if( 511 & bitBuffer == 511 ){ //9bit sync found
@@ -142,6 +125,47 @@ void syncCheck(){
     
   }
 }
+*/
+
+int flagCount = 0;
+int packetIndex = 0;
+uint8_t packet[30];
+
+void dumpPacket(){
+  Serial.println( "Begin Packet Dump" );
+  Serial.println( byteIndex );
+  for( int i=0; i < byteIndex % 9; i++  ){
+    Serial.write( packet[i] );
+  }
+  Serial.flush();
+}
+
+void beginFlag( int bit ){
+	if( bit == 1 ){
+		flagCount++;
+	}
+	else{
+		flagCount = 0;
+	}
+	if( flagCount == 9 ){
+    Serial.println( "BEGIN flag recvd" );
+    Serial.println( byteIndex );
+    dumpPacket();
+		packetIndex = 0;
+		byteIndex = 0;
+	}
+}
+
+void nextBit( int latestBit ){
+  beginFlag( latestBit );
+	thisByte = thisByte << 1;
+	thisByte = thisByte | latestBit;
+	byteIndex++;
+	if( byteIndex % 9 == 0 ){
+		packet[ byteIndex % 9 ] = thisByte;
+		thisByte = 0;
+	}
+}	
 
 void loop(){
   /*
