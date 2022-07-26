@@ -178,6 +178,3 @@ void loop(){
   Serial.flush();
 }
 
-
-
-
