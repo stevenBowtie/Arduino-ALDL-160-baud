@@ -133,7 +133,14 @@ void dataBit() {
 
 uint_16 bitBuffer = 0;
 void syncCheck(){
-  if(
+  bitBuffer = 511 & bitBuffer;
+  if( 511 & bitBuffer == 511 ){ //9bit sync found
+    frameIndex = 0;
+  }
+
+  if( frameIndex % 9 == 0 ){
+    
+  }
 }
 
 void loop(){
