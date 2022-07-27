@@ -24,7 +24,7 @@
 
 // Approx "start bit" min microsecs when transmitting a "1"
 #define ALDL_1_MIN_LENGTH 4000
-#define ALDL_1_MAX_LENGTH 6500
+#define ALDL_1_MAX_LENGTH 6000
 
 int frame[ALDL_FRAME_BUF_SIZE];
 
@@ -54,90 +54,41 @@ void setup() {
 
 void interrupt() {
   interruptCount++;
-    if (!readBit()) return;
-
-/*
-    if (bitIndex == 0) {
-        startBit();
-    } else {
-        dataBit();
-    }
-*/
+  readBit();
 }
 
-bool readBit() {
-    curTime = micros();
-    bitTime = curTime - prevTime;
-    if( !digitalRead( 3 ) ){
-      prevTime = micros(); 
-    }
-    
+void readBit() {
+  curTime = micros();
+  bitTime = curTime - prevTime;
+  if( !digitalRead( 3 ) ){
+    prevTime = micros(); 
+  }
+  
   //Serial.println( bitTime );
 
-    if (bitTime <= ALDL_0_MAX_LENGTH && bitTime >= ALDL_0_MIN_LENGTH) {
-        //curBit = 0;
-      nextBit( 0 );
-    } else if (bitTime <= ALDL_1_MAX_LENGTH && bitTime >= ALDL_1_MIN_LENGTH) {
-        //curBit = 1;
-      nextBit( 1 );
-    } else if (bitTime < ALDL_0_MIN_LENGTH) {
-        // Too short to be a bit
-        // Could be noise so we don't reset prevTime
-        //Serial.println( "ERR: Too short");
-        return false;
-    } else {
-        //Serial.println( "ERR: Too long");
-        // Too long to be a bit
-        //prevTime = curTime;
-        return false;
-    }
-}
-
-
-// Add data bit to the packet frame
-void dataBit() {
-    frame[byteIndex] |= curBit << bitIndex;
-
-    if (++bitIndex > ALDL_BYTE_SIZE) {
-        // We have a complete data byte
-        if (++byteIndex >= ALDL_FRAME_BUF_SIZE) {
-          for( int i = 0; i++; i < ALDL_FRAME_BUF_SIZE ){
-            Serial.write( frame[i] );
-        }
-          Serial.write( "\r\n" );
-          Serial.flush();
-          byteIndex = 0;
-        }
-
-        bitIndex = 0;
-    }
-}
-
-uint16_t thisByte = 0;
-/*
-void syncCheck(){
-  bitBuffer = 511 & bitBuffer;
-  if( 511 & bitBuffer == 511 ){ //9bit sync found
-    frameIndex = 0;
-  }
-
-  if( frameIndex % 9 == 0 ){
-    
+  if (bitTime <= ALDL_0_MAX_LENGTH && bitTime >= ALDL_0_MIN_LENGTH) {
+    nextBit( 0 );
+  } else if (bitTime <= ALDL_1_MAX_LENGTH && bitTime >= ALDL_1_MIN_LENGTH) {
+    nextBit( 1 );
+  } else if (bitTime > ALDL_1_MAX_LENGTH ) {
+    //nextBit( 0 );
   }
 }
-*/
 
+volatile uint16_t thisByte = 0;
 int flagCount = 0;
 int packetIndex = 0;
 uint8_t packet[30];
 
 void dumpPacket(){
-  Serial.println( "Begin Packet Dump" );
+  noInterrupts();
+  Serial.print( "\r\nBegin Packet Dump: " );
   Serial.println( byteIndex );
   for( int i=0; i < byteIndex % 9; i++  ){
     Serial.write( packet[i] );
   }
   Serial.flush();
+  interrupts();
 }
 
 void beginFlag( int bit ){
@@ -148,8 +99,6 @@ void beginFlag( int bit ){
 		flagCount = 0;
 	}
 	if( flagCount == 9 ){
-    Serial.println( "BEGIN flag recvd" );
-    Serial.println( byteIndex );
     dumpPacket();
 		packetIndex = 0;
 		byteIndex = 0;
@@ -175,6 +124,6 @@ void loop(){
   }
   */
   //Serial.println( digitalRead( 3 ) );
-  Serial.flush();
+  //Serial.flush();
 }
 
